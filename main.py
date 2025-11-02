@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 import json
 import os
@@ -28,7 +29,7 @@ PET_EMOJIS = {
 
 DATA_FILE = 'petpal_data.json'
 
-bot = commands.Bot(command_prefix='/', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 def load_data():
     if os.path.exists(DATA_FILE):
@@ -104,16 +105,20 @@ def create_pet_card(pet_data, username):
 @bot.event
 async def on_ready():
     print(f'{bot.user} is online! woohoo')
+    try:
+        synced = await bot.tree.sync()
+        print(f'Synced {len(synced)} command(s)')
+    except Exception as e:
+        print(f'Failed to sync commands: {e}')
     decay_stats.start()
 
-@bot.command()
-async def adopt(ctx):
-    """adopt a new pet"""
+@bot.tree.command(name="adopt", description="adopt a new pet")
+async def adopt(interaction: discord.Interaction):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id in data:
-        await ctx.send("sorry, you already have a pet. use `/abandon` if you want another one.")
+        await interaction.response.send_message("sorry, you already have a pet. use `/abandon` if you want another one.")
         return
     
     pet_type = random.choice(list(PET_TYPES.keys()))
@@ -141,17 +146,16 @@ async def adopt(ctx):
         description=f"you adopted a {emoji} **{evolution_chain[0]}**!\n\ntake care of your new pet by feeding, playing and making sure the pet rests well!",
         color=discord.Color.green()
     )
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-@bot.command()
-async def petinfo(ctx, user: discord.Member = None):
-    """view your pets stats"""
+@bot.tree.command(name="petinfo", description="view your pet's stats")
+async def petinfo(interaction: discord.Interaction, user: discord.Member = None):
     data = load_data()
-    target = user if user else ctx.author
+    target = user if user else interaction.user
     user_id = str(target.id)
 
     if user_id not in data:
-        await ctx.send("this user does not have a pet yet!")
+        await interaction.response.send_message("this user does not have a pet yet!")
         return
     
     pet = data[user_id]
@@ -159,7 +163,7 @@ async def petinfo(ctx, user: discord.Member = None):
     try:
         img = create_pet_card(pet, target.display_name)
         file = discord.File(img, filename="pet_card.png")
-        await ctx.send(file=file)
+        await interaction.response.send_message(file=file)
     except Exception as e:
         emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
         xp_needed = calculate_xp_needed(pet['level'])
@@ -175,22 +179,21 @@ async def petinfo(ctx, user: discord.Member = None):
         embed.add_field(name="coins", value=f"{pet['coins']}", inline=True)
         embed.set_footer(text=f"owner: {target.display_name}")
 
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
-@bot.command()
-async def feed(ctx):
-    """feed your pet"""
+@bot.tree.command(name="feed", description="feed your pet")
+async def feed(interaction: discord.Interaction):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id not in data:
-        await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
+        await interaction.response.send_message("you dont have a pet yet! use `/adopt` to get one.")
         return
     
     pet = data[user_id]
 
     if pet['hunger'] <= 10:
-        await ctx.send(f"{pet['name']} is already full!")
+        await interaction.response.send_message(f"{pet['name']} is already full!")
         return
     
     pet['hunger'] = max(0, pet['hunger'] - 30)
@@ -201,22 +204,21 @@ async def feed(ctx):
     save_data(data)
 
     emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
-    await ctx.send(f"{emoji} **{pet['name']}** enjoyed the meal!\n+10 happiness, -30 hunger, +5 xp")
+    await interaction.response.send_message(f"{emoji} **{pet['name']}** enjoyed the meal!\n+10 happiness, -30 hunger, +5 xp")
 
-@bot.command()
-async def play(ctx):
-    """play with your pet"""
+@bot.tree.command(name="play", description="play with your pet")
+async def play(interaction: discord.Interaction):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id not in data:
-        await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
+        await interaction.response.send_message("you dont have a pet yet! use `/adopt` to get one.")
         return
 
     pet = data[user_id]
 
     if pet['energy'] < 20:
-        await ctx.send(f"{pet['name']} is too tired to play. rest by using `/sleep`.")
+        await interaction.response.send_message(f"{pet['name']} is too tired to play. rest by using `/sleep`.")
         return
     
     pet['energy'] = max(0, pet['energy'] - 20)
@@ -232,22 +234,21 @@ async def play(ctx):
     activities = ['fetch', 'tug-of-war', 'hide and seek', 'catch the toy']
     activity = random.choice(activities)
 
-    await ctx.send(f"{emoji} **{pet['name']}** had fun playing {activity}!\n+20 happiness, -20 energy, +10 xp, +{coins_earned} coins")
+    await interaction.response.send_message(f"{emoji} **{pet['name']}** had fun playing {activity}!\n+20 happiness, -20 energy, +10 xp, +{coins_earned} coins")
 
-@bot.command()
-async def sleep(ctx):
-    """let your pet sleep"""
+@bot.tree.command(name="sleep", description="let your pet sleep")
+async def sleep(interaction: discord.Interaction):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id not in data:
-        await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
+        await interaction.response.send_message("you dont have a pet yet! use `/adopt` to get one.")
         return
     
     pet = data[user_id]
 
     if pet['energy'] >= 90:
-        await ctx.send(f"{pet['name']} is too full of energy to sleep!")
+        await interaction.response.send_message(f"{pet['name']} is too full of energy to sleep!")
         return
     
     pet['energy'] = min(100, pet['energy'] + 40)
@@ -258,20 +259,19 @@ async def sleep(ctx):
     save_data(data)
 
     emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
-    await ctx.send(f"{emoji} **{pet['name']}** had a good nap!\n+40 energy, +10 hunger, +3 xp")
+    await interaction.response.send_message(f"{emoji} **{pet['name']}** had a good nap!\n+40 energy, +10 hunger, +3 xp")
 
-@bot.command()
-async def rename(ctx, *, new_name: str):
-    """rename your pet"""
+@bot.tree.command(name="rename", description="rename your pet")
+async def rename(interaction: discord.Interaction, new_name: str):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id not in data:
-        await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
+        await interaction.response.send_message("you dont have a pet yet! use `/adopt` to get one.")
         return
     
     if len(new_name) > 20:
-        await ctx.send("sorry, but your pet name is too long! please make one using 20 characters or less!")
+        await interaction.response.send_message("sorry, but your pet name is too long! please make one using 20 characters or less!")
         return
     
     old_name = data[user_id]['name']
@@ -279,15 +279,14 @@ async def rename(ctx, *, new_name: str):
     save_data(data)
 
     emoji = PET_EMOJIS.get(data[user_id]['current_name'], '🐾')
-    await ctx.send(f"{emoji} your pet ({old_name}) has been renamed to **{new_name}**!")
+    await interaction.response.send_message(f"{emoji} your pet ({old_name}) has been renamed to **{new_name}**!")
 
-@bot.command()
-async def leaderboard(ctx):
-    """view the top pets from the entire server"""
+@bot.tree.command(name="leaderboard", description="view the top pets from the entire server")
+async def leaderboard(interaction: discord.Interaction):
     data = load_data()
 
     if not data:
-        await ctx.send("no pets have been adopted yet. be the first one by typing in `/adopt`!")
+        await interaction.response.send_message("no pets have been adopted yet. be the first one by typing in `/adopt`!")
         return
     
     sorted_pets = sorted(data.items(), key=lambda x: (x[1]['level'], x[1]['xp']), reverse=True)[:10]
@@ -312,23 +311,22 @@ async def leaderboard(ctx):
             inline=False
         )
     
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
-@bot.command()
-async def abandon(ctx):
-    """abandon your pet"""
+@bot.tree.command(name="abandon", description="abandon your pet")
+async def abandon(interaction: discord.Interaction):
     data = load_data()
-    user_id = str(ctx.author.id)
+    user_id = str(interaction.user.id)
 
     if user_id not in data:
-        await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
+        await interaction.response.send_message("you dont have a pet yet! use `/adopt` to get one.")
         return
     
     pet_name = data[user_id]['name']
     del data[user_id]
     save_data(data)
 
-    await ctx.send(f"you abandoned **{pet_name}**...")
+    await interaction.response.send_message(f"you abandoned **{pet_name}**...")
 
 def check_level_up(pet):
     """check if the pet should level up or evolve"""
