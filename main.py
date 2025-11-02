@@ -10,8 +10,10 @@ from PIL import Image, ImageDraw, ImageFont
 intents = discord.Intents.default()
 intents.message_content = True
 
+bot = commands.Bot(command_prefix='/', intents=intents)
+
 PET_TYPES = {
-    'car': ['car', 'big car' 'tiger'],
+    'car': ['car', 'big car', 'tiger'],
     'dawg': ['dawg', 'big dawg', 'wolf'],
     'dragon': ['baby dragon', 'dragon', 'elder dragon'],
     'hampter': ['hampter', 'guinea pig', 'capybara'],
@@ -65,23 +67,23 @@ def create_pet_card(pet_data, username):
     draw.text((250, 30), title, fill=(255, 255, 255), font=title_font, anchor="mm")
 
     type_text = f"{pet_data['current_name']} | level {pet_data['level']}"
-    draw.text((250, 70), type_text)
+    draw.text((250, 70), type_text, fill=(255, 255, 255), font=stat_font, anchor="mm")
 
     xp_needed = calculate_xp_needed(pet_data['level'])
     xp_percent = pet_data['xp'] / xp_needed
-    draw.rectangle([50, 100, 450, 120], fill(70, 70, 70))
+    draw.rectangle([50, 100, 450, 120], fill=(70, 70, 70))
     draw.rectangle([50, 100, 50 + int(400 * xp_percent), 120], fill=(88, 101, 242))
     draw.text((250, 110), f"XP: {pet_data['xp']}/{xp_needed}", fill=(255, 255, 255), font=stat_font, anchor="mm")
 
     stats = [
-        ('hunger', pet_data['hunger'], (137,66,69)),
-        ('happines', pet_data['happiness'], (254, 231, 92)),
+        ('hunger', pet_data['hunger'], (137, 66, 69)),
+        ('happiness', pet_data['happiness'], (254, 231, 92)),
         ('energy', pet_data['energy'], (87, 242, 135))
     ]
 
     y_pos = 160
     for stat_name, value, color in stats:
-        draw_text((70, y_pos), f"{stat_name}:", fill=(200, 200, 200), font=stat_font)
+        draw.text((70, y_pos), f"{stat_name}:", fill=(200, 200, 200), font=stat_font)
 
         draw.rectangle([170, y_pos - 5, 450, y_pos + 20], fill=(70, 70, 70))
 
@@ -92,7 +94,7 @@ def create_pet_card(pet_data, username):
 
         y_pos += 50
 
-    draw.text((250, 350), f"owner: {username}", fill(150, 150, 150), font=stat_font, anchor="mm")
+    draw.text((250, 350), f"owner: {username}", fill=(150, 150, 150), font=stat_font, anchor="mm")
 
     img_bytes = BytesIO()
     img.save(img_bytes, format='PNG')
@@ -101,10 +103,10 @@ def create_pet_card(pet_data, username):
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user} in online! woohoo')
+    print(f'{bot.user} is online! woohoo')
     decay_stats.start()
 
-@bot_command()
+@bot.command()
 async def adopt(ctx):
     """adopt a new pet"""
     data = load_data()
@@ -141,7 +143,7 @@ async def adopt(ctx):
     )
     await ctx.send(embed=embed)
 
-@bot_command()
+@bot.command()
 async def petinfo(ctx, user: discord.Member = None):
     """view your pets stats"""
     data = load_data()
@@ -170,12 +172,12 @@ async def petinfo(ctx, user: discord.Member = None):
         embed.add_field(name="hunger", value=f"{pet['hunger']}/100", inline=True)
         embed.add_field(name="happiness", value=f"{pet['happiness']}/100", inline=True)
         embed.add_field(name="energy", value=f"{pet['energy']}/100", inline=True)
-        embed.add_field(name="coins", value=f"{pet['coins']}/100", inline=True)
+        embed.add_field(name="coins", value=f"{pet['coins']}", inline=True)
         embed.set_footer(text=f"owner: {target.display_name}")
 
         await ctx.send(embed=embed)
 
-@bot_command()
+@bot.command()
 async def feed(ctx):
     """feed your pet"""
     data = load_data()
@@ -201,7 +203,7 @@ async def feed(ctx):
     emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
     await ctx.send(f"{emoji} **{pet['name']}** enjoyed the meal!\n+10 happiness, -30 hunger, +5 xp")
 
-@bot_command()
+@bot.command()
 async def play(ctx):
     """play with your pet"""
     data = load_data()
@@ -220,22 +222,23 @@ async def play(ctx):
     pet['energy'] = max(0, pet['energy'] - 20)
     pet['happiness'] = min(100, pet['happiness'] + 20)
     pet['xp'] += 10
-    pet['coins'] += random.randint(1, 5)
+    coins_earned = random.randint(1, 5)
+    pet['coins'] += coins_earned
 
     check_level_up(pet)
     save_data(data)
 
-    emoji = PET.EMOJIS.get(pet['current_name'], '🐾')
+    emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
     activities = ['fetch', 'tug-of-war', 'hide and seek', 'catch the toy']
     activity = random.choice(activities)
 
-    await ctx.send(f"{emoji} **{pet['name']}** had fun playing {activity}!\n+20 happiness, -20 energy, +10 xp, +coins")
+    await ctx.send(f"{emoji} **{pet['name']}** had fun playing {activity}!\n+20 happiness, -20 energy, +10 xp, +{coins_earned} coins")
 
-@bot_command()
+@bot.command()
 async def sleep(ctx):
     """let your pet sleep"""
     data = load_data()
-    user_id = str(ctx.author.id)#
+    user_id = str(ctx.author.id)
 
     if user_id not in data:
         await ctx.send("you dont have a pet yet! use `/adopt` to get one.")
@@ -255,9 +258,9 @@ async def sleep(ctx):
     save_data(data)
 
     emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
-    await ctx.send(f"**{pet['name']}** had a good nap!\n+40 energy, +10 hunger, +3 xp")
+    await ctx.send(f"{emoji} **{pet['name']}** had a good nap!\n+40 energy, +10 hunger, +3 xp")
 
-@bot_command()
+@bot.command()
 async def rename(ctx, *, new_name: str):
     """rename your pet"""
     data = load_data()
@@ -275,10 +278,10 @@ async def rename(ctx, *, new_name: str):
     data[user_id]['name'] = new_name
     save_data(data)
 
-    emoji = PET_EMOJIS.get(data['user_id']['current_name'], '🐾')
-    await ctx.send (f"{emoji} your pet ({old_name}) has been renamed to **{new_name}**!")
+    emoji = PET_EMOJIS.get(data[user_id]['current_name'], '🐾')
+    await ctx.send(f"{emoji} your pet ({old_name}) has been renamed to **{new_name}**!")
 
-@bot_command()
+@bot.command()
 async def leaderboard(ctx):
     """view the top pets from the entire server"""
     data = load_data()
@@ -305,13 +308,13 @@ async def leaderboard(ctx):
         emoji = PET_EMOJIS.get(pet['current_name'], '🐾')
         embed.add_field(
             name=f"{idx}. {emoji} {pet['name']}",
-            value=f"level {pet['level']} | owner: {username} | {pet['happiness']}",
+            value=f"level {pet['level']} | owner: {username} | happiness: {pet['happiness']}",
             inline=False
         )
     
     await ctx.send(embed=embed)
 
-@bot_command()
+@bot.command()
 async def abandon(ctx):
     """abandon your pet"""
     data = load_data()
@@ -322,7 +325,7 @@ async def abandon(ctx):
         return
     
     pet_name = data[user_id]['name']
-    del data [user_id]
+    del data[user_id]
     save_data(data)
 
     await ctx.send(f"you abandoned **{pet_name}**...")
@@ -358,3 +361,11 @@ async def decay_stats():
         pet['last_update'] = datetime.now().isoformat()
 
     save_data(data)
+
+# Run the bot
+if __name__ == '__main__':
+    token = os.getenv('DISCORD_TOKEN')
+    if not token:
+        print("Error: DISCORD_TOKEN not found in environment variables!")
+    else:
+        bot.run(token)
