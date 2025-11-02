@@ -10,8 +10,6 @@ from PIL import Image, ImageDraw, ImageFont
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='/', intents=intents)
-
 PET_TYPES = {
     'car': ['car', 'big car', 'tiger'],
     'dawg': ['dawg', 'big dawg', 'wolf'],
@@ -29,6 +27,8 @@ PET_EMOJIS = {
 }
 
 DATA_FILE = 'petpal_data.json'
+
+bot = commands.Bot(command_prefix='/', intents=intents)
 
 def load_data():
     if os.path.exists(DATA_FILE):
