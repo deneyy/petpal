@@ -281,7 +281,7 @@ async def rename(interaction: discord.Interaction, new_name: str):
     emoji = PET_EMOJIS.get(data[user_id]['current_name'], '🐾')
     await interaction.response.send_message(f"{emoji} your pet ({old_name}) has been renamed to **{new_name}**!")
 
-@bot.tree.command(name="leaderboard", description="view the top pets from the entire server")
+@bot.tree.command(name="leaderboard", description="view the top pets")
 async def leaderboard(interaction: discord.Interaction):
     data = load_data()
 
